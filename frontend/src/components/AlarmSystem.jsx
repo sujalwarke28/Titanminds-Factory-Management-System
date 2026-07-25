@@ -51,62 +51,58 @@ const AlarmSystem = () => {
 
     const sensor = machineData.sensor || machineData;
     const prediction = machineData.prediction || {};
-    // Ignore any vibration alerts from backend/analog sensor noise completely
-    const backendAlerts = (machineData.alerts || []).filter(a => 
-      !a.code?.toLowerCase().includes('vibration') && 
-      !a.title?.toLowerCase().includes('vibration') &&
-      !a.message?.toLowerCase().includes('vibration') &&
-      !a.issue?.toLowerCase().includes('vibration')
-    );
+    // Ignore any vibration and sound alerts from backend/analog sensor noise completely (Temperature alerts only)
+    const backendAlerts = (machineData.alerts || []).filter(a => {
+      const code = (a.code || '').toLowerCase();
+      const title = (a.title || '').toLowerCase();
+      const msg = (a.message || '').toLowerCase();
+      const issue = (a.issue || '').toLowerCase();
+      return !code.includes('vibration') && !title.includes('vibration') && !msg.includes('vibration') && !issue.includes('vibration') &&
+             !code.includes('sound') && !title.includes('sound') && !msg.includes('sound') && !issue.includes('sound') &&
+             !code.includes('noise') && !title.includes('noise');
+    });
 
     const temp = Number(sensor.temperature) || 0;
-    const sound = Number(sensor.sound || sensor.raw_sound) || 0;
 
-    // Strict 10-Minute (600,000 ms) Alert Silence Lock
+    // Strict 30-Second Silence Lock after Dismissal
+    const THIRTY_SECONDS_MS = 30000; // 30 seconds
     if (dismissedTimeRef.current > 0) {
       const timeSinceDismissal = Date.now() - dismissedTimeRef.current;
-      const TEN_MINUTES_MS = 600000; // 10 minutes
       
-      // If temp dropped back to normal (<= 30°C), reset dismissal lock
+      // If temperature dropped back to safe range (<= 30°C), reset dismissal lock
       if (temp <= 30.0) {
         dismissedTempRef.current = null;
         dismissedTimeRef.current = 0;
       } 
-      // If temperature rose by at least 1.5°C since dismissal, allow emergency alert
-      else if (dismissedTempRef.current !== null && temp >= dismissedTempRef.current + 1.5) {
-        dismissedTempRef.current = null;
-        dismissedTimeRef.current = 0;
-      } 
-      // Within 10 minutes of an alert dismissal -> strictly suppress any new alerts
-      else if (timeSinceDismissal < TEN_MINUTES_MS) {
+      // Within 30 seconds of dismissal -> strictly suppress ALL new notifications even if temp rises!
+      else if (timeSinceDismissal < THIRTY_SECONDS_MS) {
         setMergedAlert(null);
         return;
+      } 
+      // After 30 seconds -> reset dismissal lock so new alert can trigger
+      else {
+        dismissedTimeRef.current = 0;
       }
     }
 
     const problems = [];
 
-    // Collect active issues into 1 single notification (Vibration explicitly excluded for analog sensor)
+    // Single Temperature Exceedance Alert Only (> 30°C)
     if (temp > 30.0) {
-      problems.push(`High Temp (${temp.toFixed(1)} °C)`);
-    }
-
-    if (sound > 75) {
-      problems.push(`Sound Hazard (${sound.toFixed(0)} dB)`);
-    }
-
-    if (backendAlerts.length > 0) {
+      problems.push(`High Temperature (${temp.toFixed(1)} °C)`);
+    } else if (backendAlerts.length > 0) {
       problems.push(backendAlerts[0].title || prediction.llm_summary || 'AI Model Warning');
     }
 
+    // Render EXACTLY 1 single notification at any moment
     if (problems.length > 0) {
       const machineId = machineData.machine_id || 'CNC_01';
       setMergedAlert({
         id: `merged-${machineId}-${sensor.timestamp || Date.now()}`,
         type: 'CRITICAL',
-        title: `CRITICAL ALARM: ${machineId} Needs Attention`,
-        detail: problems.join(' • '),
-        problemsCount: problems.length,
+        title: `TEMPERATURE ALARM: ${machineId} High Temp Warning`,
+        detail: problems[0],
+        problemsCount: 1,
         timestamp: new Date().toLocaleTimeString(),
         currentTemp: temp
       });
@@ -115,9 +111,12 @@ const AlarmSystem = () => {
     }
   }, [machineData, isOnline]);
 
-  // Audio Siren Synthesizer using Web Audio API
+  // Audio Chime Synthesizer using Web Audio API
+  // Use primitive boolean so updating mergedAlert data does NOT restart or interrupt the audio loop
+  const shouldPlayAudio = Boolean(mergedAlert) && !isMuted;
+
   useEffect(() => {
-    if (mergedAlert && !isMuted) {
+    if (shouldPlayAudio) {
       startSiren();
     } else {
       stopSiren();
@@ -126,7 +125,7 @@ const AlarmSystem = () => {
     return () => {
       stopSiren();
     };
-  }, [mergedAlert, isMuted]);
+  }, [shouldPlayAudio]);
 
   // Auto-dismiss alert banner after 10 seconds
   useEffect(() => {
@@ -153,32 +152,29 @@ const AlarmSystem = () => {
       }
 
       if (!alarmIntervalRef.current && audioCtxRef.current) {
-        const playJailKlaxon = () => {
+        const playSingleChime = () => {
           try {
             const ctx = audioCtxRef.current;
+            if (!ctx || ctx.state === 'closed') return;
             const now = ctx.currentTime;
             
-            // Dual Oscillators for a heavy, loud industrial prison klaxon
-            const osc1 = ctx.createOscillator(); // Main Siren Horn
-            const osc2 = ctx.createOscillator(); // Deep Bass Sub-Horn
+            // High-Tech Modern Single Pulse Emergency Beep (880Hz A5 -> 1046.5Hz C6)
+            const osc1 = ctx.createOscillator();
+            const osc2 = ctx.createOscillator();
             const gain = ctx.createGain();
 
-            osc1.type = 'sawtooth';
-            osc2.type = 'square';
+            osc1.type = 'sine';
+            osc2.type = 'triangle';
 
-            // Jail Warning Pitch Sweep (420Hz -> 920Hz -> 420Hz "WAAAH-WAAAH")
-            osc1.frequency.setValueAtTime(420, now);
-            osc1.frequency.exponentialRampToValueAtTime(920, now + 0.35);
-            osc1.frequency.exponentialRampToValueAtTime(420, now + 0.65);
+            osc1.frequency.setValueAtTime(880, now);
+            osc1.frequency.exponentialRampToValueAtTime(1046.5, now + 0.12);
 
-            osc2.frequency.setValueAtTime(210, now);
-            osc2.frequency.exponentialRampToValueAtTime(460, now + 0.35);
-            osc2.frequency.exponentialRampToValueAtTime(210, now + 0.65);
+            osc2.frequency.setValueAtTime(440, now);
+            osc2.frequency.exponentialRampToValueAtTime(523.25, now + 0.12);
 
-            // Loud Gain Volume
-            gain.gain.setValueAtTime(0.55, now);
-            gain.gain.setValueAtTime(0.55, now + 0.55);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.68);
+            gain.gain.setValueAtTime(0.01, now);
+            gain.gain.linearRampToValueAtTime(0.28, now + 0.03);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
 
             osc1.connect(gain);
             osc2.connect(gain);
@@ -186,15 +182,15 @@ const AlarmSystem = () => {
 
             osc1.start(now);
             osc2.start(now);
-            osc1.stop(now + 0.68);
-            osc2.stop(now + 0.68);
+            osc1.stop(now + 0.22);
+            osc2.stop(now + 0.22);
           } catch (err) {
-            console.error('Jail Siren play error:', err);
+            console.error('Chime play error:', err);
           }
         };
 
-        playJailKlaxon();
-        alarmIntervalRef.current = setInterval(playJailKlaxon, 720);
+        playSingleChime();
+        alarmIntervalRef.current = setInterval(playSingleChime, 1200); // Clean, steady 1.2s single-pulse rhythm: 1 . 1 . 1 . 1
       }
     } catch (e) {
       console.log('Audio Context error:', e);
@@ -209,12 +205,9 @@ const AlarmSystem = () => {
   };
 
   const handleDismiss = () => {
-    if (mergedAlert) {
-      // Record current temp & timestamp at dismissal time to enforce 3-minute cooldown / +1.5°C rise rule
-      dismissedTempRef.current = mergedAlert.currentTemp;
-      dismissedTimeRef.current = Date.now();
-      setMergedAlert(null);
-    }
+    // Record dismissal timestamp to enforce strict 30-second silence lock
+    dismissedTimeRef.current = Date.now();
+    setMergedAlert(null);
   };
 
   if (!mergedAlert) return null;

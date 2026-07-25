@@ -87,8 +87,8 @@ const NotificationPanel = ({ userRole }) => {
         const data = await res.json();
         const alerts = (Array.isArray(data) ? data : data.alerts || data.data || [])
           .filter(a => {
-            const msg = (a.message || a.type || a.alert || '').toLowerCase();
-            return !msg.includes('vibration');
+            const msg = (a.message || a.type || a.alert || a.code || '').toLowerCase();
+            return !msg.includes('vibration') && !msg.includes('sound') && !msg.includes('noise');
           })
           .sort((a, b) => new Date(b.timestamp || b.createdAt || b.time) - new Date(a.timestamp || a.createdAt || a.time))
           .slice(0, 5);

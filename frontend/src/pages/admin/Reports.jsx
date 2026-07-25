@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { useMachineData } from '../../hooks/useMachineData';
+import { FileText, History, Download, Trash2, Loader2, Sparkles } from 'lucide-react';
 
 const BACKEND_URL = 'https://titanminds-backend.onrender.com';
 
@@ -408,7 +409,7 @@ export default function Reports() {
         </div>
 
         {/* ══ SECTION 1: GENERATE REPORT ═══════════════════════════════════════ */}
-        <Sect icon="📄">GENERATE ENTERPRISE REPORT</Sect>
+        <Sect icon={<FileText size={14} color={C.cyan} />}>GENERATE ENTERPRISE REPORT</Sect>
         <Panel style={{ padding: '1.5rem 1.75rem', marginBottom: '1.5rem' }}>
           <form onSubmit={handleGenerateReport}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem', marginBottom: '1.25rem' }}>
@@ -480,30 +481,41 @@ export default function Reports() {
                 type="submit"
                 disabled={isGenerating}
                 style={{
-                  padding: '9px 24px', background: `linear-gradient(135deg, ${C.cyan}44, ${C.electric}44)`,
-                  border: `1px solid ${C.cyan}`, borderRadius: 8, color: '#fff',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '10px 24px', background: 'linear-gradient(135deg, #1e40af 0%, #0369a1 100%)',
+                  border: '1px solid #1e40af', borderRadius: 8, color: '#ffffff',
                   fontFamily: 'monospace', fontSize: '0.78rem', fontWeight: 900,
                   letterSpacing: '0.08em', cursor: isGenerating ? 'wait' : 'pointer',
-                  boxShadow: `0 0 20px ${C.cyan}22`, transition: 'all 0.2s'
+                  boxShadow: '0 4px 14px rgba(3,105,161,0.3)', transition: 'all 0.2s'
                 }}
               >
-                {isGenerating ? '⏳ GENERATING REPORT...' : '⬇ GENERATE & DOWNLOAD REPORT'}
+                {isGenerating ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" /> GENERATING REPORT...
+                  </>
+                ) : (
+                  <>
+                    <Download size={16} /> GENERATE & DOWNLOAD REPORT
+                  </>
+                )}
               </button>
             </div>
           </form>
         </Panel>
 
         {/* ══ SECTION 2: RECENT REPORTS TABLE ══════════════════════════════════ */}
-        <Sect icon="▣">RECENTLY GENERATED REPORTS HISTORY</Sect>
+        <Sect icon={<History size={14} color={C.cyan} />}>RECENTLY GENERATED REPORTS HISTORY</Sect>
         <Panel style={{ overflowX: 'auto', marginBottom: '1.5rem' }}>
           {recentReports.length === 0 ? (
             /* ══ EMPTY STATE ══ */
             <div style={{ padding: '3.5rem 1.5rem', textAlign: 'center' }}>
-              <div style={{ fontSize: '2.5rem', opacity: 0.3, marginBottom: '0.5rem' }}>📄</div>
-              <div style={{ fontSize: '0.9rem', fontFamily: 'monospace', fontWeight: 700, color: 'rgba(255,255,255,0.6)' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.5rem' }}>
+                <FileText size={42} style={{ opacity: 0.3, color: C.cyan }} />
+              </div>
+              <div style={{ fontSize: '0.9rem', fontFamily: 'monospace', fontWeight: 700, color: 'var(--panel-text-primary)' }}>
                 No Reports Have Been Generated Yet.
               </div>
-              <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace', marginTop: 4 }}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--panel-text-muted)', fontFamily: 'monospace', marginTop: 4 }}>
                 Select a report type and click "Generate & Download Report" to compile real historical telemetry.
               </div>
             </div>
@@ -522,20 +534,20 @@ export default function Reports() {
                     <td style={{ padding: '0.75rem 1rem', fontWeight: 800, fontFamily: 'monospace', color: C.cyan }}>
                       {r.id}
                     </td>
-                    <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#fff', maxWidth: 260 }}>
+                    <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: 'var(--panel-text-primary)', maxWidth: 260 }}>
                       {r.name}
                     </td>
-                    <td style={{ padding: '0.75rem 1rem', fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)', fontFamily: 'monospace' }}>
+                    <td style={{ padding: '0.75rem 1rem', fontSize: '0.72rem', color: 'var(--panel-text-muted)', fontFamily: 'monospace' }}>
                       {r.type?.replace('_', ' ')}
                     </td>
-                    <td style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)' }}>
+                    <td style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', color: 'var(--panel-text-secondary)' }}>
                       {r.generatedBy}
                     </td>
-                    <td style={{ padding: '0.75rem 1rem', fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '0.75rem 1rem', fontSize: '0.7rem', color: 'var(--panel-text-muted)', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
                       {relTime(r.timestamp)}
                     </td>
                     <td style={{ padding: '0.75rem 1rem' }}>
-                      <span style={{ fontSize: '0.65rem', padding: '2px 8px', borderRadius: 999, fontWeight: 800, background: r.format === 'PDF' ? 'rgba(124,58,237,0.15)' : r.format === 'EXCEL' ? 'rgba(0,255,136,0.15)' : 'rgba(255,179,0,0.15)', color: r.format === 'PDF' ? '#c4b5fd' : r.format === 'EXCEL' ? C.green : C.amber, fontFamily: 'monospace' }}>
+                      <span style={{ fontSize: '0.65rem', padding: '2px 8px', borderRadius: 999, fontWeight: 800, background: r.format === 'PDF' ? 'rgba(124,58,237,0.15)' : r.format === 'EXCEL' ? 'rgba(0,255,136,0.15)' : 'rgba(255,179,0,0.15)', color: r.format === 'PDF' ? 'var(--color-purple-text)' : r.format === 'EXCEL' ? C.green : C.amber, fontFamily: 'monospace' }}>
                         {r.format}
                       </span>
                     </td>
@@ -543,19 +555,19 @@ export default function Reports() {
                       {r.recordCount} rows
                     </td>
                     <td style={{ padding: '0.75rem 1rem' }}>
-                      <div style={{ display: 'flex', gap: 6 }}>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                         <button
                           onClick={() => downloadReportFile(r)}
-                          style={{ padding: '3px 8px', background: `${C.cyan}18`, border: `1px solid ${C.cyan}44`, borderRadius: 4, color: C.cyan, fontSize: '0.68rem', fontFamily: 'monospace', fontWeight: 700, cursor: 'pointer' }}
+                          style={{ padding: '4px 10px', background: `${C.cyan}18`, border: `1px solid ${C.cyan}44`, borderRadius: 4, color: C.cyan, fontSize: '0.68rem', fontFamily: 'monospace', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                         >
-                          ⬇ Download
+                          <Download size={13} /> Download
                         </button>
                         <button
                           onClick={() => handleDeleteReport(r.id)}
-                          style={{ background: 'none', border: 'none', color: 'rgba(255,59,59,0.5)', cursor: 'pointer', fontSize: '0.75rem' }}
+                          style={{ background: 'none', border: 'none', color: 'var(--color-red-text)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 4, opacity: 0.8 }}
                           title="Delete Report Entry"
                         >
-                          🗑
+                          <Trash2 size={14} />
                         </button>
                       </div>
                     </td>

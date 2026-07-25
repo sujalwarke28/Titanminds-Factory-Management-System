@@ -16,6 +16,7 @@ import MachineManagement from './pages/admin/MachineManagement';
 import AdminAiAnalytics from './pages/admin/AiAnalytics';
 import InfrastructureHealth from './pages/admin/InfrastructureHealth';
 import AdminLiveTelemetry from './pages/admin/LiveTelemetry';
+import AdminFinancialInsights from './pages/admin/FinancialInsights';
 import UserManagement from './pages/admin/UserManagement';
 import AdminAlerts from './pages/admin/Alerts';
 import AdminReports from './pages/admin/Reports';
@@ -69,6 +70,7 @@ const AppContent = () => {
         <Route path="machine-management" element={<MachineManagement />} />
         <Route path="ai-analytics" element={<AdminAiAnalytics />} />
         <Route path="live-telemetry" element={<AdminLiveTelemetry />} />
+        <Route path="financial-insights" element={<AdminFinancialInsights />} />
         <Route path="infrastructure-health" element={<InfrastructureHealth />} />
         <Route path="user-management" element={<UserManagement />} />
         <Route path="alerts" element={<AdminAlerts />} />

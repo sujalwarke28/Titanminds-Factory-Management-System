@@ -121,7 +121,7 @@ const LOCAL_STORAGE_KEY = 'titanmind_registered_machines_v1';
 /*                         MACHINE MANAGEMENT PAGE                              */
 /* ════════════════════════════════════════════════════════════════════════════ */
 
-export default function MachineManagement() {
+export default function MachineManagement({ showRegisterBtn = true, title = 'MACHINE ASSET MANAGEMENT' }) {
   const navigate = useNavigate();
   const { machineData, isOnline, machineState } = useMachineData();
 
@@ -329,7 +329,7 @@ export default function MachineManagement() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
                 <div style={{ width: 3, height: 28, background: `linear-gradient(180deg, ${C.cyan}, ${C.electric})`, borderRadius: 2 }} />
                 <h1 style={{ fontSize: '1.5rem', fontWeight: 900, letterSpacing: '-0.02em', margin: 0, background: `linear-gradient(135deg, #ffffff 0%, ${C.cyan} 60%, ${C.electric} 100%)`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                  MACHINE ASSET MANAGEMENT
+                  {title}
                 </h1>
               </div>
               <div style={{ fontSize: '0.7rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.28)', letterSpacing: '0.15em', paddingLeft: 15 }}>
@@ -337,20 +337,22 @@ export default function MachineManagement() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-              <button
-                onClick={() => setIsWizardOpen(true)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 8, padding: '8px 18px',
-                  background: `linear-gradient(135deg, ${C.cyan}22, ${C.electric}44)`,
-                  border: `1px solid ${C.cyan}66`, borderRadius: 8, color: '#fff',
-                  fontFamily: 'monospace', fontSize: '0.75rem', fontWeight: 800,
-                  letterSpacing: '0.08em', cursor: 'pointer', boxShadow: `0 0 15px ${C.cyan}22`
-                }}
-              >
-                <span style={{ fontSize: '1rem', color: C.cyan }}>+</span> REGISTER NEW MACHINE
-              </button>
-            </div>
+            {showRegisterBtn && (
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                <button
+                  onClick={() => setIsWizardOpen(true)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '8px 18px',
+                    background: `linear-gradient(135deg, ${C.cyan}22, ${C.electric}44)`,
+                    border: `1px solid ${C.cyan}66`, borderRadius: 8, color: '#fff',
+                    fontFamily: 'monospace', fontSize: '0.75rem', fontWeight: 800,
+                    letterSpacing: '0.08em', cursor: 'pointer', boxShadow: `0 0 15px ${C.cyan}22`
+                  }}
+                >
+                  <span style={{ fontSize: '1rem', color: C.cyan }}>+</span> REGISTER NEW MACHINE
+                </button>
+              </div>
+            )}
           </div>
         </Panel>
 

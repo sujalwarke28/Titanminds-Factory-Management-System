@@ -97,11 +97,24 @@ const fmtTime = ts => {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
 };
 
+const getAlertTs = (a) => {
+  if (!a) return Date.now();
+  // Check fresh creation/timestamp fields BEFORE legacy timeline.detected_at
+  const raw = a.created_at || a.createdAt || a.timestamp || a.time || a.updated_at || a.timeline?.detected_at;
+  if (!raw) return Date.now();
+  const parsed = new Date(raw).getTime();
+  return isNaN(parsed) ? Date.now() : parsed;
+};
+
 const relTime = ts => {
   if (!ts) return '—';
-  const d = Date.now() - new Date(ts).getTime();
-  const m = Math.floor(d / 60000);
-  if (m < 1) return 'just now';
+  const val = typeof ts === 'object' && ts !== null ? getAlertTs(ts) : new Date(ts).getTime();
+  if (isNaN(val)) return '—';
+  const d = Date.now() - val;
+  const s = Math.floor(d / 1000);
+  if (s < 10) return 'just now';
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
   if (m < 60) return `${m}m ago`;
   const h = Math.floor(m / 60);
   return h < 24 ? `${h}h ago` : `${Math.floor(h / 24)}d ago`;
@@ -122,26 +135,49 @@ export default function Alerts() {
   const [levelFilter, setLevelFilter]   = useState('ALL'); // ALL, CRITICAL, WARNING, INFO
   const [codeFilter, setCodeFilter]     = useState('ALL');  // ALL, TEMP, SOUND, OFFLINE
 
-  /* ── Fetch all stored alerts from MongoDB ── */
+  /* ── Fetch all stored alerts + Live Sensor & Registration Alerts ── */
   const fetchAllAlerts = useCallback(async () => {
     try {
       const res = await fetch(`${BACKEND_URL}/api/exp32/alerts?limit=1000`);
-      if (!res.ok) throw new Error('Failed to fetch alerts');
-      const data = await res.json();
-      const rawList = Array.isArray(data) ? data : (data.alerts || []);
-      
-      // Filter out any vibration alerts completely as instructed
+      let rawList = [];
+      if (res.ok) {
+        const data = await res.json();
+        rawList = Array.isArray(data) ? data : (data.alerts || []);
+      }
+
+      // Filter out vibration AND sound/noise alerts completely as instructed (temperature & system alerts only)
       const nonVib = rawList.filter(a => {
         const code = (a.code || '').toLowerCase();
         const msg = (a.message || '').toLowerCase();
-        return !code.includes('vibration') && !msg.includes('vibration');
+        return !code.includes('vibration') && !msg.includes('vibration') &&
+               !code.includes('sound') && !msg.includes('sound') && !code.includes('noise');
       });
 
-      // Sort ALL alerts in strict DESCENDING order of time (newest at the top)
+      // 1. Incorporate real-time pending registration alerts
+      try {
+        const masterRaw = localStorage.getItem('titanminds_users_master_db_final');
+        if (masterRaw) {
+          const users = JSON.parse(masterRaw);
+          const pending = users.filter(u => u.status === 'pending');
+          pending.forEach(u => {
+            nonVib.push({
+              _id: `reg-${u.id}`,
+              machine_id: 'USER_REGISTRATION',
+              code: 'user_registration_pending',
+              level: 'warning',
+              severity: 'warning',
+              message: `Pending Registration: ${u.name} (${u.email}) is awaiting admin approval`,
+              timeline: { detected_at: u.createdAt || new Date().toISOString() },
+              createdAt: u.createdAt,
+              status: 'PENDING_APPROVAL',
+            });
+          });
+        }
+      } catch {}
+
+      // Sort ALL alerts in strict DESCENDING order of time (newest at the very top)
       nonVib.sort((a, b) => {
-        const tsA = new Date(a.timeline?.detected_at || a.created_at || a.updated_at).getTime();
-        const tsB = new Date(b.timeline?.detected_at || b.created_at || b.updated_at).getTime();
-        return tsB - tsA; // Descending: newest first
+        return getAlertTs(b) - getAlertTs(a); // Descending: newest timestamp first
       });
 
       setAlerts(nonVib);
@@ -153,10 +189,26 @@ export default function Alerts() {
     }
   }, []);
 
+  // Fast 1.5s real-time poll + cross-window BroadcastChannel + storage listener
   useEffect(() => {
     fetchAllAlerts();
-    const timer = setInterval(fetchAllAlerts, 15000); // 15s refresh
-    return () => clearInterval(timer);
+    const timer = setInterval(fetchAllAlerts, 1500); // 1.5s real-time poll
+
+    // BroadcastChannel listener for instant cross-tab registration alerts
+    let bc;
+    try {
+      bc = new BroadcastChannel('titanminds_registration_channel');
+      bc.onmessage = () => fetchAllAlerts();
+    } catch {}
+
+    const handleStorage = () => fetchAllAlerts();
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      clearInterval(timer);
+      if (bc) bc.close();
+      window.removeEventListener('storage', handleStorage);
+    };
   }, [fetchAllAlerts]);
 
   // Derived KPI Metrics
@@ -164,11 +216,11 @@ export default function Alerts() {
     const total    = alerts.length;
     const critical = alerts.filter(a => a.level === 'critical' || a.severity === 'critical').length;
     const warning  = alerts.filter(a => a.level === 'warning' || a.severity === 'warning').length;
-    const temp     = alerts.filter(a => (a.code || '').includes('temperature')).length;
-    const sound    = alerts.filter(a => (a.code || '').includes('sound')).length;
+    const temp     = alerts.filter(a => (a.code || '').includes('temperature') || (a.message || '').toLowerCase().includes('temp')).length;
+    const userReg  = alerts.filter(a => (a.code || '').includes('user_registration')).length;
     const offline  = alerts.filter(a => (a.code || '').includes('offline')).length;
 
-    return { total, critical, warning, temp, sound, offline };
+    return { total, critical, warning, temp, userReg, offline };
   }, [alerts]);
 
   // Filtered Alert List
@@ -248,12 +300,12 @@ export default function Alerts() {
         {/* ══ SECTION 1: ALERT KPI CARDS ═══════════════════════════════════════ */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
           {[
-            { label: 'Total Stored Alerts', value: loading ? '…' : kpis.total,     color: C.cyan,     sub: 'All MongoDB Records' },
+            { label: 'Total Stored Alerts', value: loading ? '…' : kpis.total,     color: C.cyan,     sub: 'All Real Database Logs' },
             { label: 'Critical Severity',   value: loading ? '…' : kpis.critical,  color: kpis.critical > 0 ? C.red : C.green, sub: 'Immediate Action Required' },
             { label: 'Warning Thresholds',  value: loading ? '…' : kpis.warning,   color: kpis.warning > 0 ? C.amber : C.green, sub: 'Sensor Parameter Warning' },
-            { label: 'Temperature Alerts',  value: loading ? '…' : kpis.temp,      color: kpis.temp > 0 ? C.orange : C.green, sub: 'Temp Exceedances' },
-            { label: 'Acoustic / Sound',    value: loading ? '…' : kpis.sound,     color: kpis.sound > 0 ? C.electric : C.green, sub: 'Noise Spikes (dB)' },
-            { label: 'Sensor Offline Logs', value: loading ? '…' : kpis.offline,   color: kpis.offline > 0 ? C.red : C.green, sub: 'Device Disconnects' },
+            { label: 'Temperature Alerts',  value: loading ? '…' : kpis.temp,      color: kpis.temp > 0 ? C.red : C.green, sub: 'Temp Exceedances (>30°C)' },
+            { label: 'Pending Approvals',   value: loading ? '…' : kpis.userReg,   color: kpis.userReg > 0 ? C.electric : C.green, sub: 'User Registration Requests' },
+            { label: 'Sensor Offline Logs', value: loading ? '…' : kpis.offline,   color: kpis.offline > 0 ? C.amber : C.green, sub: 'Device Disconnects' },
           ].map(({ label, value, color, sub }) => (
             <Panel key={label} style={{ padding: '0.9rem 1.1rem' }}>
               <div style={{ fontSize: '0.6rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.28)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 7 }}>{label}</div>
@@ -300,8 +352,7 @@ export default function Alerts() {
                   style={{ padding: '0.5rem 0.75rem', background: 'rgba(0,0,0,0.4)', border: `1px solid ${C.border}`, borderRadius: 6, color: C.cyan, fontSize: '0.72rem', fontFamily: 'monospace', outline: 'none' }}
                 >
                   <option value="ALL" style={{ background: C.navy }}>All Categories</option>
-                  <option value="TEMP" style={{ background: C.navy }}>Temperature</option>
-                  <option value="SOUND" style={{ background: C.navy }}>Acoustic Sound</option>
+                  <option value="TEMP" style={{ background: C.navy }}>Temperature Exceedances</option>
                   <option value="OFFLINE" style={{ background: C.navy }}>Device Offline</option>
                 </select>
               </div>
@@ -359,20 +410,20 @@ export default function Alerts() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
               <thead>
                 <tr style={{ borderBottom: `1px solid ${C.border}`, color: 'rgba(255,255,255,0.3)', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                  {['#', 'Date', 'Time (HH:MM:SS)', 'Machine ID', 'Severity', 'Alert Code', 'Reason / Message', 'Time Ago'].map(h => (
+                  {['#', 'Date', 'Time (HH:MM:SS)', 'Machine ID', 'Severity', 'Alert Code', 'Time Ago', 'Reason / Message'].map(h => (
                     <th key={h} style={{ padding: '0.75rem 1rem', fontWeight: 600, fontFamily: 'monospace' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {filteredAlerts.map((a, i) => {
-                  const ts = a.timeline?.detected_at || a.created_at || a.updated_at;
+                  const ts = getAlertTs(a);
                   const isCrit = a.level === 'critical' || a.severity === 'critical';
                   const sColor = isCrit ? C.red : C.amber;
 
                   return (
                     <tr
-                      key={a.id || i}
+                      key={a._id || a.id || i}
                       style={{
                         borderBottom: `1px solid ${C.border}`,
                         background: isCrit ? 'rgba(255,59,59,0.03)' : 'transparent',
@@ -385,7 +436,7 @@ export default function Alerts() {
                       </td>
 
                       {/* DATE */}
-                      <td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace', fontWeight: 700, color: 'var(--panel-text-primary)', whiteSpace: 'nowrap' }}>
                         {fmtDate(ts)}
                       </td>
 
@@ -409,6 +460,11 @@ export default function Alerts() {
                       {/* Code */}
                       <td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace', fontSize: '0.73rem', color: 'rgba(255,255,255,0.4)' }}>
                         {a.code}
+                      </td>
+
+                      {/* Time Ago */}
+                      <td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace', fontSize: '0.73rem', color: 'var(--panel-text-muted)', whiteSpace: 'nowrap' }}>
+                        {relTime(ts)}
                       </td>
 
                       {/* Reason / Message */}

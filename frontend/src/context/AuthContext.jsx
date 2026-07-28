@@ -11,7 +11,7 @@ const HEARTBEAT_KEY = 'titanminds_online_heartbeats'; // { [userId]: lastSeenTim
 
 // Default seed users
 const INITIAL_USERS = [
-  { id: 'usr-1', name: 'Admin User',    email: 'admin@mail.com',   password: '1234', role: 'admin',    status: 'approved', createdAt: new Date(Date.now() - 86400000 * 5).toISOString() },
+  { id: 'usr-1', name: 'Sujal Warke',    email: 'admin@mail.com',   password: '1234', role: 'admin',    status: 'approved', createdAt: new Date(Date.now() - 86400000 * 5).toISOString() },
   { id: 'usr-2', name: 'Plant Manager', email: 'manager@mail.com', password: '1234', role: 'manager',  status: 'approved', createdAt: new Date(Date.now() - 86400000 * 3).toISOString() },
   { id: 'usr-3', name: 'Lead Engineer', email: 'engg@mail.com',    password: '1234', role: 'engineer', status: 'approved', createdAt: new Date(Date.now() - 86400000 * 2).toISOString() },
 ];
@@ -118,12 +118,10 @@ export const AuthProvider = ({ children }) => {
     } catch {}
     setUsers(newList);
 
-    // BroadcastChannel: fires in EVERY other window/tab on the same origin
     try {
       channelRef.current?.postMessage({ type: 'USERS_UPDATED' });
     } catch {}
 
-    // Also trigger storage event for same-window listeners (belt + suspenders)
     try {
       window.dispatchEvent(new StorageEvent('storage', {
         key: MASTER_USERS_KEY,
@@ -135,7 +133,6 @@ export const AuthProvider = ({ children }) => {
 
   // ── Lifecycle: Set up BroadcastChannel + storage event + 800ms poller ───────
   useEffect(() => {
-    // 1. BroadcastChannel — most reliable cross-window method
     try {
       const bc = new BroadcastChannel(BROADCAST_CHANNEL);
       bc.onmessage = (evt) => {
@@ -143,13 +140,10 @@ export const AuthProvider = ({ children }) => {
       };
       channelRef.current = bc;
     } catch {
-      channelRef.current = null; // BroadcastChannel not supported (very rare)
+      channelRef.current = null;
     }
 
-    // 2. Native storage event — fires when ANOTHER window writes localStorage
     window.addEventListener('storage', syncFromStorage);
-
-    // 3. Polling fallback — catches everything else (same-window, Safari, etc.)
     const poll = setInterval(syncFromStorage, 800);
 
     return () => {
@@ -166,7 +160,7 @@ export const AuthProvider = ({ children }) => {
     if (!inDb) return;
     if (inDb.status !== 'approved') {
       logout();
-    } else if (inDb.role !== user.role) {
+    } else if (inDb.role !== user.role || inDb.name !== user.name) {
       const updated = { ...user, role: inDb.role, name: inDb.name };
       setUser(updated);
       try { localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(updated)); } catch {}
@@ -175,9 +169,24 @@ export const AuthProvider = ({ children }) => {
 
   /* ─── Auth Methods ───────────────────────────────────────────────────────── */
 
+  const updateUserProfileName = (newName) => {
+    if (!newName) return;
+    const list = readUsersFromStorage() ?? users;
+    
+    if (user) {
+      const updatedUser = { ...user, name: newName };
+      setUser(updatedUser);
+      try { localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(updatedUser)); } catch {}
+
+      const updatedList = list.map(u => 
+        u.email.toLowerCase() === user.email.toLowerCase() ? { ...u, name: newName } : u
+      );
+      saveUsers(updatedList);
+    }
+  };
+
   const login = (email, password) => {
     const clean = email.trim().toLowerCase();
-    // Always read directly from storage so we never miss a just-registered user
     const list = readUsersFromStorage() ?? users;
     const found = list.find(u => u.email.toLowerCase() === clean);
 
@@ -195,7 +204,6 @@ export const AuthProvider = ({ children }) => {
 
   const register = (name, email, password) => {
     const clean = email.trim().toLowerCase();
-    // Read directly from storage for the freshest list
     const list = readUsersFromStorage() ?? users;
 
     if (list.some(u => u.email.toLowerCase() === clean)) {
@@ -242,7 +250,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, users, login, register, approveUser, rejectUser, updateUserRole, deleteUser, logout }}>
+    <AuthContext.Provider value={{ user, users, updateUserProfileName, login, register, approveUser, rejectUser, updateUserRole, deleteUser, logout }}>
       {children}
     </AuthContext.Provider>
   );

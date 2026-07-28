@@ -3,12 +3,38 @@ import { Volume2, VolumeX, CheckCircle, ShieldAlert, ArrowRight, PhoneCall } fro
 import { useNavigate } from 'react-router-dom';
 import { useMachineData } from '../hooks/useMachineData';
 import { useAuth } from '../context/AuthContext';
+import { getSettings } from '../services/settingsService';
+import { playAlertTonePreview } from '../services/alertTonePlayer';
 
 const AlarmSystem = () => {
   const { machineData, isOnline } = useMachineData();
   const { user } = useAuth();
   const userRole = user?.role || '';
   const navigate = useNavigate();
+
+  // Dynamically track active CPS Temperature Threshold from Settings
+  const [cpsTempThreshold, setCpsTempThreshold] = useState(() => {
+    const s = getSettings();
+    return Number(s?.tempThreshold) || 30;
+  });
+
+  useEffect(() => {
+    const syncCpsSettings = () => {
+      const s = getSettings();
+      if (s?.tempThreshold !== undefined) {
+        setCpsTempThreshold(Number(s.tempThreshold));
+      }
+    };
+
+    syncCpsSettings();
+    window.addEventListener('titanminds_settings_changed', syncCpsSettings);
+    window.addEventListener('storage', syncCpsSettings);
+
+    return () => {
+      window.removeEventListener('titanminds_settings_changed', syncCpsSettings);
+      window.removeEventListener('storage', syncCpsSettings);
+    };
+  }, []);
 
   const getTelemetryPath = () => {
     if (userRole === 'admin') return '/admin/live-telemetry';
@@ -23,7 +49,6 @@ const AlarmSystem = () => {
   // Track temperature and timestamp at the moment user clicks Dismiss
   const dismissedTempRef = useRef(null);
   const dismissedTimeRef = useRef(0);
-  const lastCallTimeRef = useRef(0);
   const audioCtxRef = useRef(null);
   const alarmIntervalRef = useRef(null);
 
@@ -34,7 +59,7 @@ const AlarmSystem = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: `Call From Titanminds, Problem Detected on your C N C zero one machine. ${detailMsg}`
+          message: `Call From Titanminds, Problem Detected on your C N C zero one machine. ${detailMsg || `Temperature exceeded CPS threshold of ${cpsTempThreshold} degrees C.`}`
         })
       });
       setTimeout(() => setCallingState(false), 4000);
@@ -44,7 +69,7 @@ const AlarmSystem = () => {
     }
   };
 
-  // Evaluate thresholds & merged issues
+  // Evaluate thresholds based STRICTLY on CPS Temp Threshold (ignoring hardcoded backend alerts)
   useEffect(() => {
     if (!isOnline || !machineData) {
       setMergedAlert(null);
@@ -53,18 +78,6 @@ const AlarmSystem = () => {
     }
 
     const sensor = machineData.sensor || machineData;
-    const prediction = machineData.prediction || {};
-    // Ignore any vibration and sound alerts from backend/analog sensor noise completely (Temperature alerts only)
-    const backendAlerts = (machineData.alerts || []).filter(a => {
-      const code = (a.code || '').toLowerCase();
-      const title = (a.title || '').toLowerCase();
-      const msg = (a.message || '').toLowerCase();
-      const issue = (a.issue || '').toLowerCase();
-      return !code.includes('vibration') && !title.includes('vibration') && !msg.includes('vibration') && !issue.includes('vibration') &&
-             !code.includes('sound') && !title.includes('sound') && !msg.includes('sound') && !issue.includes('sound') &&
-             !code.includes('noise') && !title.includes('noise');
-    });
-
     const temp = Number(sensor.temperature) || 0;
 
     // Strict 30-Second Silence Lock after Dismissal
@@ -72,8 +85,8 @@ const AlarmSystem = () => {
     if (dismissedTimeRef.current > 0) {
       const timeSinceDismissal = Date.now() - dismissedTimeRef.current;
       
-      // If temperature dropped back to safe range (<= 30°C), reset dismissal lock
-      if (temp <= 30.0) {
+      // If temperature dropped back to safe range (<= cpsTempThreshold°C), reset dismissal lock
+      if (temp <= cpsTempThreshold) {
         dismissedTempRef.current = null;
         dismissedTimeRef.current = 0;
       } 
@@ -90,11 +103,9 @@ const AlarmSystem = () => {
 
     const problems = [];
 
-    // Single Temperature Exceedance Alert Only (> 30°C)
-    if (temp > 30.0) {
-      problems.push(`High Temperature (${temp.toFixed(1)} °C)`);
-    } else if (backendAlerts.length > 0) {
-      problems.push(backendAlerts[0].title || prediction.llm_summary || 'AI Model Warning');
+    // Trigger alert ONLY if live telemetry temperature exceeds CPS Temp Threshold
+    if (temp > cpsTempThreshold) {
+      problems.push(`High Temperature (${temp.toFixed(1)} °C) exceeding CPS threshold (${cpsTempThreshold} °C)`);
     }
 
     // Render EXACTLY 1 single notification at any moment
@@ -112,10 +123,9 @@ const AlarmSystem = () => {
     } else {
       setMergedAlert(null);
     }
-  }, [machineData, isOnline]);
+  }, [machineData, isOnline, cpsTempThreshold]);
 
   // Audio Chime Synthesizer using Web Audio API
-  // Use primitive boolean so updating mergedAlert data does NOT restart or interrupt the audio loop
   const shouldPlayAudio = Boolean(mergedAlert) && !isMuted;
 
   useEffect(() => {
@@ -143,57 +153,20 @@ const AlarmSystem = () => {
 
   const startSiren = () => {
     try {
-      if (!audioCtxRef.current) {
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        if (AudioContext) {
-          audioCtxRef.current = new AudioContext();
-        }
-      }
-
-      if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
-        audioCtxRef.current.resume();
-      }
-
-      if (!alarmIntervalRef.current && audioCtxRef.current) {
+      if (!alarmIntervalRef.current) {
         const playSingleChime = () => {
           try {
-            const ctx = audioCtxRef.current;
-            if (!ctx || ctx.state === 'closed') return;
-            const now = ctx.currentTime;
-            
-            // High-Tech Modern Single Pulse Emergency Beep (880Hz A5 -> 1046.5Hz C6)
-            const osc1 = ctx.createOscillator();
-            const osc2 = ctx.createOscillator();
-            const gain = ctx.createGain();
-
-            osc1.type = 'sine';
-            osc2.type = 'triangle';
-
-            osc1.frequency.setValueAtTime(880, now);
-            osc1.frequency.exponentialRampToValueAtTime(1046.5, now + 0.12);
-
-            osc2.frequency.setValueAtTime(440, now);
-            osc2.frequency.exponentialRampToValueAtTime(523.25, now + 0.12);
-
-            gain.gain.setValueAtTime(0.01, now);
-            gain.gain.linearRampToValueAtTime(0.28, now + 0.03);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
-
-            osc1.connect(gain);
-            osc2.connect(gain);
-            gain.connect(ctx.destination);
-
-            osc1.start(now);
-            osc2.start(now);
-            osc1.stop(now + 0.22);
-            osc2.stop(now + 0.22);
+            // Dynamically play tone configured in platform settings
+            const settings = getSettings();
+            const toneId = settings?.alertTone || '1';
+            playAlertTonePreview(toneId);
           } catch (err) {
             console.error('Chime play error:', err);
           }
         };
 
         playSingleChime();
-        alarmIntervalRef.current = setInterval(playSingleChime, 1200); // Clean, steady 1.2s single-pulse rhythm: 1 . 1 . 1 . 1
+        alarmIntervalRef.current = setInterval(playSingleChime, 1400);
       }
     } catch (e) {
       console.log('Audio Context error:', e);
@@ -234,7 +207,7 @@ const AlarmSystem = () => {
         border: '2px solid #f87171',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-between',
+        justify: 'space-between',
         gap: '16px',
         animation: 'pulse 1.5s infinite'
       }}
@@ -246,7 +219,7 @@ const AlarmSystem = () => {
           borderRadius: '50%',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
+          justify: 'center',
           flexShrink: 0
         }}>
           <ShieldAlert size={32} color="#fff" />
@@ -342,7 +315,7 @@ const AlarmSystem = () => {
           Inspect <ArrowRight size={16} />
         </button>
 
-        {/* Dismiss with 1.5°C Hysteresis */}
+        {/* Dismiss */}
         <button
           onClick={handleDismiss}
           style={{

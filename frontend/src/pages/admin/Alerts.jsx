@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useMachineData } from '../../hooks/useMachineData';
+import { getSettings } from '../../services/settingsService';
 
 const BACKEND_URL = 'https://titanminds-backend.onrender.com';
 
@@ -130,10 +131,26 @@ export default function Alerts() {
   const [loading, setLoading]     = useState(true);
   const [lastRefreshed, setLastRefreshed] = useState(null);
 
+  // Active platform configuration settings
+  const settings = getSettings();
+  const activeTempThreshold = settings?.tempThreshold ?? 30;
+
   // Filters & Search
   const [searchQuery, setSearchQuery]   = useState('');
   const [levelFilter, setLevelFilter]   = useState('ALL'); // ALL, CRITICAL, WARNING, INFO
   const [codeFilter, setCodeFilter]     = useState('ALL');  // ALL, TEMP, SOUND, OFFLINE
+
+  /* Helper to format temperature alert messages dynamically matching threshold */
+  const formatAlertReason = (message, code) => {
+    if (!message) return `Temperature is above ${activeTempThreshold}°C`;
+    const lowerMsg = message.toLowerCase();
+    const lowerCode = (code || '').toLowerCase();
+    
+    if (lowerCode === 'temperature_threshold' || lowerMsg.includes('temperature is above')) {
+      return `Temperature is above ${activeTempThreshold}°C`;
+    }
+    return message;
+  };
 
   /* ── Fetch all stored alerts + Live Sensor & Registration Alerts ── */
   const fetchAllAlerts = useCallback(async () => {
@@ -303,7 +320,7 @@ export default function Alerts() {
             { label: 'Total Stored Alerts', value: loading ? '…' : kpis.total,     color: C.cyan,     sub: 'All Real Database Logs' },
             { label: 'Critical Severity',   value: loading ? '…' : kpis.critical,  color: kpis.critical > 0 ? C.red : C.green, sub: 'Immediate Action Required' },
             { label: 'Warning Thresholds',  value: loading ? '…' : kpis.warning,   color: kpis.warning > 0 ? C.amber : C.green, sub: 'Sensor Parameter Warning' },
-            { label: 'Temperature Alerts',  value: loading ? '…' : kpis.temp,      color: kpis.temp > 0 ? C.red : C.green, sub: 'Temp Exceedances (>30°C)' },
+            { label: 'Temperature Alerts',  value: loading ? '…' : kpis.temp,      color: kpis.temp > 0 ? C.red : C.green, sub: `Temp Exceedances (>${activeTempThreshold}°C)` },
             { label: 'Pending Approvals',   value: loading ? '…' : kpis.userReg,   color: kpis.userReg > 0 ? C.electric : C.green, sub: 'User Registration Requests' },
             { label: 'Sensor Offline Logs', value: loading ? '…' : kpis.offline,   color: kpis.offline > 0 ? C.amber : C.green, sub: 'Device Disconnects' },
           ].map(({ label, value, color, sub }) => (
@@ -349,13 +366,18 @@ export default function Alerts() {
                 <select
                   value={codeFilter}
                   onChange={e => setCodeFilter(e.target.value)}
-                  style={{ padding: '0.5rem 0.75rem', background: 'rgba(0,0,0,0.4)', border: `1px solid ${C.border}`, borderRadius: 6, color: C.cyan, fontSize: '0.72rem', fontFamily: 'monospace', outline: 'none' }}
+                  style={{
+                    padding: '0.5rem 0.8rem', background: 'rgba(0,0,0,0.3)',
+                    border: `1px solid ${C.border}`, borderRadius: 8, color: C.cyan,
+                    fontSize: '0.75rem', fontFamily: 'monospace', outline: 'none', cursor: 'pointer'
+                  }}
                 >
-                  <option value="ALL" style={{ background: C.navy }}>All Categories</option>
-                  <option value="TEMP" style={{ background: C.navy }}>Temperature Exceedances</option>
-                  <option value="OFFLINE" style={{ background: C.navy }}>Device Offline</option>
+                  <option value="ALL">All Categories</option>
+                  <option value="TEMP">Temperature Alerts</option>
+                  <option value="OFFLINE">Offline Status</option>
                 </select>
               </div>
+
             </div>
 
             {/* Bottom row: Severity Pills */}
@@ -467,9 +489,9 @@ export default function Alerts() {
                         {relTime(ts)}
                       </td>
 
-                      {/* Reason / Message */}
+                      {/* Reason / Message (Dynamically Formatted to Active Settings Threshold) */}
                       <td style={{ padding: '0.75rem 1rem', color: 'rgba(255,255,255,0.8)', fontSize: '0.8rem', fontWeight: 600, maxWidth: 350 }}>
-                        {a.message}
+                        {formatAlertReason(a.message, a.code)}
                       </td>
 
                       {/* Time Ago */}

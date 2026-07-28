@@ -283,7 +283,7 @@ export default function AdminDashboard() {
             { label: 'Health Score',       value: health !== null ? `${health}%` : '—', color: hColor, sub: aiRisk || 'NO AI DATA' },
             { label: 'Failure Risk',       value: failProb !== null ? `${Math.round(failProb * 100)}%` : '—', color: failProb > 0.6 ? C.red : C.amber, sub: failProb > 0.6 ? 'HIGH — ACT NOW' : 'MANAGEABLE' },
             { label: 'Active Alerts',      value: alerts !== null ? nonVibAlerts.length : '…', color: alertCritical.length > 0 ? C.red : C.amber, sub: alerts ? `${alertCritical.length} CRITICAL` : 'LOADING' },
-            { label: 'AI Confidence',      value: confidence !== null ? `${Math.round(confidence * 100)}%` : '—', color: C.electric, sub: 'GROQ LLM MODEL' },
+            { label: 'AI Confidence',      value: confidence !== null ? `${Math.round(confidence * 100)}%` : '—', color: C.electric, sub: 'AI ENGINE MODEL' },
           ].map(({ label, value, color, sub }) => (
             <Panel key={label} style={{ padding: '0.9rem 1.1rem' }}>
               <div style={{ fontSize: '0.6rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.28)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 7 }}>{label}</div>
@@ -300,7 +300,7 @@ export default function AdminDashboard() {
 
           {/* AI Rings Panel */}
           <Panel style={{ padding: '1.5rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ fontSize: '0.6rem', fontFamily: 'monospace', color: C.electric, letterSpacing: '0.15em', opacity: 0.9 }}>◈ GROQ LLM · LIVE INFERENCE</div>
+            <div style={{ fontSize: '0.6rem', fontFamily: 'monospace', color: C.electric, letterSpacing: '0.15em', opacity: 0.9 }}>◈ TITANMINDS AI · LIVE INFERENCE</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.25rem', justifyContent: 'center', padding: '0.5rem 0' }}>
               <Ring value={health || 0}       size={110} stroke={9} color={hColor}   label={health !== null ? `${health}%` : '—'}            sub="HEALTH" />
               <Ring value={failProb ? failProb * 100 : 0} size={110} stroke={9} color={failProb > 0.6 ? C.red : C.amber} label={failProb !== null ? `${Math.round(failProb * 100)}%` : '—'} sub="FAILURE" />
@@ -463,7 +463,7 @@ export default function AdminDashboard() {
                 { label: 'ESP32 Microcontroller',   ok: isOnline,                    detail: isOnline ? 'Device Connected' : 'Device Offline' },
                 { label: 'DHT11 Temp Sensor',       ok: liveTemp !== null,           detail: liveTemp !== null ? `${liveTemp.toFixed(1)}°C` : 'No Reading' },
                 { label: 'Sound Sensor (Analog)',    ok: isOnline,                   detail: isOnline ? `${liveSound} dB` : 'No Reading' },
-                { label: 'Groq LLM AI Engine',      ok: isOnline && confidence !== null, detail: confidence !== null ? `Conf: ${Math.round(confidence * 100)}%` : 'Awaiting Data' },
+                { label: 'TitanMinds AI Engine',      ok: isOnline && confidence !== null, detail: confidence !== null ? `Conf: ${Math.round(confidence * 100)}%` : 'Awaiting Data' },
                 { label: 'Alert Engine (MongoDB)',   ok: alerts !== null,             detail: alerts !== null ? `${nonVibAlerts.length} records` : 'Loading…' },
               ].map(({ label, ok, detail }) => (
                 <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 0.75rem', borderRadius: 6, background: ok ? 'rgba(0,255,136,0.04)' : 'rgba(255,59,59,0.04)', border: `1px solid ${ok ? 'rgba(0,255,136,0.1)' : 'rgba(255,59,59,0.1)'}` }}>
@@ -481,7 +481,7 @@ export default function AdminDashboard() {
         {/* ══ DATA INTEGRITY FOOTER ════════════════════════════════════════════ */}
         <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.8rem 1.2rem', borderRadius: 8, background: 'rgba(0,229,255,0.03)', border: `1px solid ${C.border}`, flexWrap: 'wrap', gap: 8 }}>
           <div style={{ fontSize: '0.6rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.18)', letterSpacing: '0.06em' }}>
-            ■ DATA INTEGRITY: 100% LIVE — ESP32 · MONGODB · GROQ LLM · WEBSOCKET · ZERO HARDCODED VALUES
+            ■ DATA INTEGRITY: 100% LIVE — ESP32 · MONGODB · AI INFERENCE · WEBSOCKET · ZERO HARDCODED VALUES
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.6rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.18)' }}>
             <Pulse color={C.cyan} size={5} />

@@ -598,7 +598,7 @@ export default function FactoryOverview() {
               { label: 'ESP32 Microcontroller', ok: isOnline, detail: isOnline ? 'Device Connected' : 'Device Offline' },
               { label: 'DHT11 Temp Sensor', ok: liveTemp !== null, detail: liveTemp !== null ? `Reading: ${liveTemp.toFixed(1)}°C` : 'No Reading' },
               { label: 'Sound Sensor (Analog)', ok: isOnline, detail: isOnline ? `Reading: ${liveSound} dB` : 'No Reading' },
-              { label: 'Groq LLM AI Engine', ok: isOnline && confidence !== null, detail: isOnline ? `Conf: ${confidence !== null ? Math.round(confidence * 100) : '—'}%` : 'Awaiting Telemetry' },
+              { label: 'TitanMinds AI Engine', ok: isOnline && confidence !== null, detail: isOnline ? `Conf: ${confidence !== null ? Math.round(confidence * 100) : '—'}%` : 'Awaiting Telemetry' },
               { label: 'Alert Database Engine', ok: alerts !== null, detail: alerts !== null ? `${nonVibAlerts.length} records` : 'Loading…' },
             ].map(({ label, ok, detail }) => (
               <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 0.75rem', borderRadius: 6, background: ok ? 'rgba(0,255,136,0.04)' : 'rgba(255,59,59,0.04)', border: `1px solid ${ok ? 'rgba(0,255,136,0.12)' : 'rgba(255,59,59,0.12)'}` }}>
@@ -615,7 +615,7 @@ export default function FactoryOverview() {
         {/* ══ FOOTER ══════════════════════════════════════════════════════════ */}
         <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 1.25rem', borderRadius: 8, background: 'rgba(0,229,255,0.03)', border: '1px solid rgba(0,229,255,0.08)', flexWrap: 'wrap', gap: 8 }}>
           <div style={{ fontSize: '0.62rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.2)', letterSpacing: '0.06em' }}>
-            ■ DATA INTEGRITY: 100% LIVE — ESP32 TELEMETRY · MONGODB ALERTS · GROQ LLM PREDICTIONS · WEBSOCKET STREAM · ZERO HARDCODED VALUES
+            ■ DATA INTEGRITY: 100% LIVE — ESP32 TELEMETRY · MONGODB ALERTS · AI PREDICTIONS · WEBSOCKET STREAM · ZERO HARDCODED VALUES
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.62rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.2)' }}>
             <Pulse color={C.cyan} size={5} />

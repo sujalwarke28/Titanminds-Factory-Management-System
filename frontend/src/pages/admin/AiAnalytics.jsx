@@ -387,7 +387,7 @@ export default function AiAnalytics() {
                 </h1>
               </div>
               <div style={{ fontSize: '0.7rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.28)', letterSpacing: '0.15em', paddingLeft: 15 }}>
-                GROQ LLM · REAL-TIME INFERENCE · HISTORICAL PREDICTION ANALYTICS · ZERO HARDCODED VALUES
+                TITANMINDS AI · REAL-TIME INFERENCE · HISTORICAL PREDICTION ANALYTICS · ZERO HARDCODED VALUES
               </div>
             </div>
             <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
@@ -676,7 +676,7 @@ export default function AiAnalytics() {
                     return <ProgBar key={label} label={label} pct={pct} count={count} maxCount={predsWithData.length} color={colors[i]} />;
                   })}
                   <div style={{ marginTop: '0.75rem', padding: '0.6rem', background: 'rgba(124,58,237,0.06)', borderRadius: 8, fontSize: '0.65rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.4)', textAlign: 'center', letterSpacing: '0.05em' }}>
-                    Model: Groq LLM (Async Inference) · {predsWithData.length} total predictions
+                    Model: TitanMinds AI Engine (Async Inference) · {predsWithData.length} total predictions
                   </div>
                 </div>
               )
@@ -751,7 +751,7 @@ export default function AiAnalytics() {
         {/* ── Footer ── */}
         <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.8rem 1.2rem', borderRadius: 8, background: 'rgba(124,58,237,0.04)', border: `1px solid rgba(124,58,237,0.15)`, flexWrap: 'wrap', gap: 8 }}>
           <div style={{ fontSize: '0.6rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.18)', letterSpacing: '0.06em' }}>
-            ■ DATA INTEGRITY: ALL METRICS COMPUTED FROM LIVE GROQ LLM PREDICTIONS · MONGODB READINGS ({readings.length}) · ALERTS ({histAlerts.length}) · ZERO HARDCODED VALUES
+            ■ DATA INTEGRITY: ALL METRICS COMPUTED FROM LIVE AI PREDICTIONS · MONGODB READINGS ({readings.length}) · ALERTS ({histAlerts.length}) · ZERO HARDCODED VALUES
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.6rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.18)' }}>
             <Pulse color={C.electric} size={5} />

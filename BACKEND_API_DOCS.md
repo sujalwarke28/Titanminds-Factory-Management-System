@@ -439,7 +439,7 @@ Fired immediately (<50ms) upon receiving telemetry:
 ```
 
 #### Event 2: Async AI LLM Insight Broadcast (`prediction_updated`)
-Fired when background Groq LLM analysis completes (~1.5s later) to enrich the record:
+Fired when background AI analysis completes (~1.5s later) to enrich the record:
 
 ```json
 {

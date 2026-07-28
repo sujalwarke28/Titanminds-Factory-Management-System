@@ -10,8 +10,11 @@ const AlarmSystem = () => {
   const userRole = user?.role || '';
   const navigate = useNavigate();
 
-  // Alerts should ONLY be visible on Engineer and Manager portals, NOT Admin
-  if (userRole === 'admin') return null;
+  const getTelemetryPath = () => {
+    if (userRole === 'admin') return '/admin/live-telemetry';
+    if (userRole === 'manager') return '/manager/live-telemetry';
+    return '/engineer/live-telemetry';
+  };
   
   const [mergedAlert, setMergedAlert] = useState(null);
   const [isMuted, setIsMuted] = useState(false);
@@ -321,7 +324,7 @@ const AlarmSystem = () => {
 
         {/* View Telemetry */}
         <button
-          onClick={() => navigate('/engineer/live-telemetry')}
+          onClick={() => navigate(getTelemetryPath())}
           style={{
             background: '#ffffff',
             color: '#dc2626',
